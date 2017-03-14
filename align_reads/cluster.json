@@ -1,0 +1,56 @@
+{
+  "__default__" :
+  {
+    "walltime" : "2:00:00",
+    "mem" : "5gb",
+    "queue" : "new",
+    "logfile" : "/gpfs/home/gkarthik/logs/new.txt",
+    "n" : 1,
+    "stdout" : "oe"
+  },
+  "align_reads" :
+  {
+    "walltime" : "5:00:00",
+    "mem" : "5gb",
+    "queue" : "new",
+    "logfile" : "/gpfs/home/gkarthik/logs/align.txt",
+    "n" : 1,
+    "stdout" : "oe"
+  },
+  "sort_aligned_bam" :
+  {
+    "walltime" : "2:00:00",
+    "mem" : "2gb",
+    "queue" : "new",
+    "logfile" : "/gpfs/home/gkarthik/logs/sort.txt",
+    "n" : 1,
+    "stdout" : "oe"
+  },
+  "trim_reads" :
+  {
+    "walltime" : "2:00:00",
+    "mem" : "5gb",
+    "queue" : "new",
+    "logfile" : "/gpfs/home/gkarthik/logs/trim.txt",
+    "n" : 1,
+    "stdout" : "oe"
+  },
+  "extract_read_1" :
+  {
+    "walltime" : "2:00:00",
+    "mem" : "2gb",
+    "queue" : "new",
+    "logfile" : "/gpfs/home/gkarthik/logs/extract.txt",
+    "n" : 1,
+    "stdout" : "oe"
+  },
+  "extract_read_2" :
+  {
+    "walltime" : "2:00:00",
+    "mem" : "2gb",
+    "queue" : "new",
+    "logfile" : "/gpfs/home/gkarthik/logs/extract.txt",
+    "n" : 1,
+    "stdout" : "oe"
+  }
+}

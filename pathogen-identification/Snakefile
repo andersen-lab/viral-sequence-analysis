@@ -1,0 +1,115 @@
+import os
+from datetime import datetime
+import time
+from subprocess import call
+import datetime
+
+# Input directory
+in_dir="/gpfs/group/andersen/raw_data/170211_M01244_0101_000000000-AWB19/Unaligned/PathSeq"
+neg_ctrl="GN"
+ext="fastq.gz"
+gz = True if ".gz" in ext else False
+clip_path="/gpfs/group/andersen/db/depletion_databases/contaminants.fasta"
+
+s = datetime.now().strftime("%Y.%m.%d."+str(int(time.time())))
+out_dir="/gpfs/home/gkarthik/analysis/"+s
+
+# Rename Default MiSeq naming to _R1 from _S*_L***_R
+SAMPLES = []
+for dirname, dirnames, filenames in os.walk(in_dir):
+     filenames.sort()
+     for f in range(0, len(filenames)-1, 2):
+          if ext in filenames[f] and ext in filenames[f+1]:
+               new_name1 = re.sub('_S\d{1}_L\d{3}_R', '_R', filenames[f])
+               new_name1 = re.sub('_\d{3}', '', new_name1)
+               os.rename(os.path.join(dirname,filenames[f]), os.path.join(dirname, new_name1))
+               new_name2 = re.sub('_S\d{1}_L\d{3}_R', '_R', filenames[f+1])
+               new_name2 = re.sub('_\d{3}', '', new_name2)
+               os.rename(os.path.join(dirname,filenames[f+1]), os.path.join(dirname, new_name2))
+               SAMPLES.append(new_name1.replace("."+ext, "").replace("_R1", ""))
+
+rule all:
+    input:
+        "{out_dir}/_filtered/".format(out_dir = out_dir)
+
+rule run_filtering:
+    input:
+        temp="{out_dir}/_kraken_outputs/"
+    output:
+        results_dir="{out_dir}/_filtered/",
+        neg_ctrl="{neg}".format(neg = neg_ctrl)
+    shell:
+        "module load python/3.5.1;"
+        "python3 /gpfs/home/gkarthik/jobs/pathogen_dashboard/run_pipeline.py -i {input} -o {output.results_dir} -c {output.neg_ctrl}"
+        
+rule run_kraken:
+    input:
+        reads1 = "{out_dir}/_dedup_reads/{sample}_R1.dedup.trimmed.fastq".format(out_dir = out_dir, sample = s) for s in SAMPLES,
+        reads2 = "{out_dir}/_dedup_reads/{sample}_R2.dedup.trimmed.fastq".format(out_dir = out_dir, sample = s) for s in SAMPLES,
+        src_db="/gpfs/group/andersen/db/kraken/kraken_full",
+        db="/scratch_ssd/kraken_full"
+    output:
+        meta = "{out_dir}/_meta/",
+        temp="{out_dir}/_temp/",
+        unclassified="{out_dir}/_unclassified/",
+        kraken_outputs="{out_dir}/_kraken_outputs/"
+    run:
+        for i in [output.meta, output.temp, output.unclassified]:
+             if not os.path.exists(i):
+                  os.makedirs(i)
+        if not os.path.isfile(db):
+             print("Started copying "+datetime.datetime.now().isoformat())
+             call(["cp", "-r", src_db, db])
+             print("Finished copying "+datetime.datetime.now().isoformat())     
+        for i in range(0, len(reads1)):
+             name = re.sub("_R\d{1}.fastq", "", input.reads1[i])
+             print(name)
+             command = "/gpfs/home/gkarthik/bin/kraken/kraken --threads 16 --db "+input.db+" --fastq-input --paired "+input.reads1[i]+" "+input.reads2[i]+" --unclassified-out "+output.unclassified+name+".unclassified.output > "+output.kraken_outputs+name+".kraken.full.output && cut -f2,3 "+output.kraken_outputs+name+".kraken.full.output | /gpfs/home/gkarthik/bin/krona/bin/ktImportTaxonomy /dev/stdin -o "+meta+name+".kraken.full.html"
+             call(command.split())
+
+rule qc_and_trim_reads:
+    input:
+        read1="{out_dir}/_reads/{sample}_R1.fastq",
+        read2="{out_dir}/_reads/{sample}_R2.fastq",
+        clip_path="{clip_path}".format(clip_path=clip_path)
+    output:
+        trim1 = "{out_dir}/_trimmed/{sample}_R1.trimmed.fastq",
+        trim2 = "{out_dir}/_trimmed/{sample}_R2.trimmed.fastq",
+        trim_unpaired1="{out_dir}/_trimmed/{sample}_R1.trimmed_unpaired.fastq",
+        trim_unpaired2="{out_dir}/_trimmed/{sample}_R2.trimmed_unpaired.fastq",
+        reports="{out_dir}/_reports"
+    shell:
+        "mkdir -p $(dirname {output.trim1})/ {output.reports}/;"
+        "/gpfs/home/gkarthik/bin/fastqc/fastqc -f fastq {input.read1} {input,read2} -o {output.reports};"
+        "java -Xmx2g -classpath /gpfs/home/gkarthik/bin/trimmomatic/trimmomatic-0.35.jar org.usadellab.trimmomatic.TrimmomaticPE -threads 16  {input.read1} {input.read2} {output.trim1} {output.trim_unpaired1} {output.trim2} {output.trim_unpaired2} ILLUMINACLIP:{input.clip_path}:2:30:12 LEADING:20 TRAILING:20 SLIDINGWINDOW:4:25 MINLEN:30"
+
+rule deduplication:
+    input:
+        read1="{out_dir}/_trimmed/{sample}_R1.trimmed.fastq",
+        read2="{out_dir}/_trimmed/{sample}_R2.trimmed.fastq"
+    output:
+        dedup_read1="{out_dir}/_dedup_reads/{sample}_R1.dedup.trimmed.fastq",
+        dedup_read2="{out_dir}/_dedup_reads/{sample}_R2.dedup.trimmed.fastq",
+        temp="{out_dir}/_temp"
+    shell:
+        "mkdir -p {output.temp}/;"
+        "echo {input.read1} > {output.temp}/{sample}.fuinput && echo {input.read2} >> {output.temp}/{sample}.fuinput"
+        "/gpfs/home/gkarthik/fastuniq/source/fastuniq -i {output.temp}/{sample}.fuinput -o {output.dedup_read1} -p {output.dedup_read2};
+        
+rule extract_read_1:
+    input:
+        "{in_dir}".format(in_dir = in_dir)+"/{sample}_R1.fastq.gz"
+    output:
+        "{out_dir}/_reads/{sample}_R1.fastq"
+    shell:
+        "mkdir -p $(dirname {output})/; "
+        "if [[ {input} == *.gz ]]; then gunzip -c {input} > {output}; else cp {input} {output};fi;"
+
+rule extract_read_2:
+    input:
+        "{in_dir}".format(in_dir = in_dir)+"/{sample}_R2.fastq.gz"
+    output:
+        "{out_dir}/_reads/{sample}_R2.fastq"
+    shell:
+        "mkdir -p $(dirname {output})/; "
+        "if [[ {input} == *.gz ]]; then gunzip -c {input} > {output}; else cp {input} {output};fi;"
