@@ -1,6 +1,6 @@
-# Viral Sequence Analysis Pipelines
+#### Viral Sequence Analysis Pipelines
 
-Tools used
+**Tools used**
 
 * [Novoalign v3.04.04](http://www.novocraft.com/support/download/)
 * [Trimmomatic v0.36](http://www.usadellab.org/cms/index.php?page=trimmomatic)
@@ -8,10 +8,9 @@ Tools used
 * [Snakemake v3.8.1](https://bitbucket.org/snakemake/snakemake/)
 * [Kraken](http://genomebiology.biomedcentral.com/articles/10.1186/gb-2014-15-3-r46)
 
-Dependencies for plot_coverage.py
+**Dependencies for plot_coverage.py**
 
 * [Pandas](http://pandas.pydata.org/)
 
-Docker
-
+**Docker**
 Coming soon ..
